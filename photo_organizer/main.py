@@ -5,7 +5,7 @@ from photo_organizer import log, __version__
 from photo_organizer.organize_photos import organize
 
 logger = logging.getLogger(__name__)
-log.setup_logging(name="photo_organizer", level="DEBUG")
+log.setup_logging(name="photo_organizer", level="INFO")
 
 
 def run():
