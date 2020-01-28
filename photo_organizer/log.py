@@ -38,7 +38,7 @@ def setup_logging(name, level="INFO", fmt=FORMAT):
                 'utc': True,
                 'backupCount': 5,
                 'level': level,
-                'filename': '{}/app_manager.log'.format(log_dir),
+                'filename': '{}/photo_organizer.log'.format(log_dir),
                 'formatter': 'standard',
             }
         },
