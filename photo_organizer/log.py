@@ -29,7 +29,7 @@ def setup_logging(name, level="INFO", fmt=FORMAT):
             'default': {
                 'class': 'logging.StreamHandler',
                 'formatter': 'standard',
-                'level': level,
+                'level': 'DEBUG',
                 'stream': 'ext://sys.stdout'
             },
             'file': {

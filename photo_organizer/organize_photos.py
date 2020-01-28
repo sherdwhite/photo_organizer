@@ -20,6 +20,7 @@ def organize():
     for root, subdirs, files in os.walk(origin_dir):
         for file in files:
             file_dir = '{0}/{1}'.format(root, file)
+            logger.debug('At file: {}'.format(file_dir))
             try:
                 with open(file_dir, 'rb') as image_file:
                     my_image = exif.Image(image_file)
@@ -35,9 +36,13 @@ def organize():
                         if not os.path.exists(file_destination):
                             logger.info('Moving file {0} to {1}'.format(file, file_destination))
                             shutil.copy(file_dir, file_destination)
+                    image_file.close()
             except (AssertionError, AttributeError) as ex:
-                logger.error('File {0} at location {1} could not be moved.'.format(file, file_destination))
+                logger.error('File {0} at location {1} could not be moved. Error: {2}'.format(file, file_dir, ex))
+                image_file.close()
                 continue
             except TypeError:
-                logger.error('File {0} at location {1} could not be moved due to missing datetime.'.format(file, file_destination))
+                logger.error('File {0} at location {1} could not be moved, missing datetime. '
+                             'Error: {2}'.format(file, file_dir, ex))
+                image_file.close()
                 continue
