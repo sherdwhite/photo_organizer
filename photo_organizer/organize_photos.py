@@ -41,7 +41,7 @@ def organize():
                 logger.error('File {0} at location {1} could not be moved. Error: {2}'.format(file, file_dir, ex))
                 image_file.close()
                 continue
-            except TypeError:
+            except TypeError as ex:
                 logger.error('File {0} at location {1} could not be moved, missing datetime. '
                              'Error: {2}'.format(file, file_dir, ex))
                 image_file.close()
