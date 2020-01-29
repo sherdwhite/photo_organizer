@@ -18,7 +18,6 @@ def organize():
     logger.info("Destination Directory: {}".format(destination_dir))
 
     for root, subdirs, files in os.walk(origin_dir):
-        print(root)
         if not os.listdir(root):
             os.rmdir(root)
             print('Removing directory {}'.format(root))
