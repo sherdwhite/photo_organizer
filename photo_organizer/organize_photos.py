@@ -73,7 +73,11 @@ def handle_error_cases(destination_dir, file, image_file, file_dir):
     folder_destination = ('{0}/{1}'.format(destination_dir, 'Unknown'))
     if not os.path.exists(folder_destination):
         os.makedirs(folder_destination)
-    logger.debug('Moving file {0} to {1}'.format(file, file_destination))
-    shutil.copy(file_dir, file_destination)
-    image_file.close()
-    os.remove(file_dir)
+    if not os.path.exists(file_destination):
+        logger.debug('Moving file {0} to {1}'.format(file, file_destination))
+        shutil.copy(file_dir, file_destination)
+        image_file.close()
+        os.remove(file_dir)
+    else:
+        image_file.close()
+        os.remove(file_dir)
