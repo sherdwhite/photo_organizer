@@ -5,6 +5,9 @@ import shutil
 import exif
 
 from datetime import datetime
+
+from exif import Image
+
 from photo_organizer.utils import parse_args
 
 logger = logging.getLogger(__name__)
@@ -30,8 +33,15 @@ def organize():
             try:
                 with open(file_dir, 'rb') as image_file:
                     my_image = exif.Image(image_file)
+                    print(dir(my_image))
                     if my_image.has_exif:
                         datetime_original = my_image.get('datetime_original')
+                        if not datetime_original:
+                            print(my_image.get('media_created'))
+                            datetime_original = my_image.get('media_created')
+                        if not datetime_original:
+                            print(my_image.get('datetime_digitized'))
+                            datetime_original = my_image.get('datetime_digitized')
                         date = datetime.strptime(datetime_original, '%Y:%m:%d %H:%M:%S')
                         year = date.year
                         month = str(date.month).zfill(2)
