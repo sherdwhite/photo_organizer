@@ -7,6 +7,7 @@ import exif
 from datetime import datetime
 
 from exif import Image
+from plum import UnpackError
 
 from photo_organizer.utils import parse_args
 
@@ -71,7 +72,7 @@ def organize():
                              'Error: {2}'.format(file, file_dir, ex))
                 handle_error_cases(destination_dir, file, image_file, file_dir)
                 continue
-            except ValueError as ex:
+            except (ValueError, UnpackError) as ex:
                 logger.error('File {0} at location {1} has possible bad exif data. Error: {2}'
                              'Error: {2}'.format(file, file_dir, ex))
                 handle_error_cases(destination_dir, file, image_file, file_dir)
