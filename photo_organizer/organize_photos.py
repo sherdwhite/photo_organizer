@@ -6,7 +6,6 @@ import exif
 
 from datetime import datetime
 
-from exif import Image
 from plum import UnpackError
 
 from photo_organizer.utils import parse_args
