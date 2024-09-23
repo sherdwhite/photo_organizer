@@ -1,2 +1,4 @@
 exif==1.6.0
 gevent==24.2.1
+hachoir==3.3.0
+pillow==10.4.0
