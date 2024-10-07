@@ -4,125 +4,18 @@ import shutil
 from datetime import datetime
 from struct import error as UnpackError
 
-from exif import Image
-from hachoir.metadata import extractMetadata
-from hachoir.parser import createParser
-from PIL import Image as PILImage
-
+from photo_organizer.file_types.avi import extract_avi_creation_date
+from photo_organizer.error_handling import log_and_handle_error
+from photo_organizer.exif import extract_exif_data
+from photo_organizer.file_types.gif import extract_gif_creation_date
+from photo_organizer.file_types.m4v import extract_m4v_creation_date
+from photo_organizer.file_types.mov import extract_mov_creation_date
+from photo_organizer.file_types.mp4 import extract_mp4_creation_date
+from photo_organizer.file_types.png import extract_png_creation_date
+from photo_organizer.file_types.threegp import extract_3gp_creation_date
 from photo_organizer.utils import parse_args
 
 logger = logging.getLogger(__name__)
-
-
-def log_and_handle_error(destination_dir, file, file_dir, error_message):
-    logger.error(error_message)
-    handle_error_cases(destination_dir, file, file_dir)
-
-
-def extract_exif_data(image_file):
-    my_image = Image(image_file)
-    if my_image.has_exif:
-        datetime_original = (
-            my_image.get("datetime_original")
-            or my_image.get("media_created")
-            or my_image.get("datetime_digitized")
-        )
-        return datetime_original
-    return None
-
-
-def extract_mov_creation_date(file_path):
-    parser = createParser(file_path)
-    if not parser:
-        return None
-    with parser:
-        metadata = extractMetadata(parser)
-    if metadata and metadata.has("creation_date"):
-        return metadata.get("creation_date").strftime("%Y:%m:%d %H:%M:%S")
-    return None
-
-
-def extract_png_creation_date(file_path):
-    try:
-        img = PILImage.open(file_path)
-        info = img.info
-        if "creation_time" in info:
-            return info["creation_time"]
-        elif "date:create" in info:
-            return info["date:create"]
-    except Exception as e:
-        logger.error(f"Error extracting PNG creation date: {e}")
-    return None
-
-
-def extract_avi_creation_date(file_path):
-    parser = createParser(file_path)
-    if not parser:
-        return None
-    with parser:
-        metadata = extractMetadata(parser)
-    if metadata and metadata.has("creation_date"):
-        return metadata.get("creation_date").strftime("%Y:%m:%d %H:%M:%S")
-    return None
-
-
-def extract_mp4_creation_date(file_path):
-    parser = createParser(file_path)
-    if not parser:
-        return None
-    with parser:
-        metadata = extractMetadata(parser)
-    if metadata and metadata.has("creation_date"):
-        return metadata.get("creation_date").strftime("%Y:%m:%d %H:%M:%S")
-    return None
-
-
-def extract_3gp_creation_date(file_path):
-    parser = createParser(file_path)
-    if not parser:
-        return None
-    with parser:
-        metadata = extractMetadata(parser)
-    if metadata and metadata.has("creation_date"):
-        return metadata.get("creation_date").strftime("%Y:%m:%d %H:%M:%S")
-    return None
-
-
-def extract_gif_creation_date(file_path):
-    try:
-        img = PILImage.open(file_path)
-        info = img.info
-        if "date:create" in info:
-            return info["date:create"]
-        elif "date:modify" in info:
-            return info["date:modify"]
-    except Exception as e:
-        logger.error(f"Error extracting GIF creation date: {e}")
-    return None
-
-
-def extract_m4v_creation_date(file_path):
-    parser = createParser(file_path)
-    if not parser:
-        return None
-    with parser:
-        metadata = extractMetadata(parser)
-    if metadata and metadata.has("creation_date"):
-        return metadata.get("creation_date").strftime("%Y:%m:%d %H:%M:%S")
-    return None
-
-
-def handle_error_cases(destination_dir, file, file_dir):
-    file_destination = os.path.join(destination_dir, "Unknown", file)
-    folder_destination = os.path.join(destination_dir, "Unknown")
-    if not os.path.exists(folder_destination):
-        os.makedirs(folder_destination)
-    if not os.path.exists(file_destination):
-        logger.debug("Moving file {0} to {1}".format(file, file_destination))
-        shutil.copy(file_dir, file_destination)
-        os.remove(file_dir)
-    else:
-        os.remove(file_dir)
 
 
 def organize():
