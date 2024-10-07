@@ -1,6 +1,6 @@
-from PIL import Image as PILImage
-
 import logging
+
+from PIL import Image as PILImage
 
 logger = logging.getLogger(__name__)
 

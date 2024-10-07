@@ -4,9 +4,9 @@ import shutil
 from datetime import datetime
 from struct import error as UnpackError
 
-from photo_organizer.file_types.avi import extract_avi_creation_date
 from photo_organizer.error_handling import log_and_handle_error
 from photo_organizer.exif import extract_exif_data
+from photo_organizer.file_types.avi import extract_avi_creation_date
 from photo_organizer.file_types.gif import extract_gif_creation_date
 from photo_organizer.file_types.m4v import extract_m4v_creation_date
 from photo_organizer.file_types.mov import extract_mov_creation_date
