@@ -28,13 +28,13 @@ def organize():
     for root, subdirs, files in os.walk(origin_dir):
         if not os.listdir(root):
             os.rmdir(root)
-            print("Removing directory {}".format(root))
+            print(f"Removing directory {root}")
         for file in files:
             file_dir = os.path.join(root, file)
             if file in {"Thumbs.db", "desktop"}:
                 os.remove(file_dir)
                 continue
-            print("At file: {}".format(file_dir))
+            print(f"At file: {file_dir}")
             try:
                 datetime_original = None
                 if file.lower().endswith(".mov"):
@@ -74,24 +74,21 @@ def organize():
                         destination_dir,
                         file,
                         file_dir,
-                        "File {0} at location {1} has no exif data.".format(
-                            file, file_dir
-                        ),
+                        f"File {file} at location {file_dir} has no exif data.",
                     )
             except (ValueError, UnpackError) as ex:
                 log_and_handle_error(
                     destination_dir,
                     file,
                     file_dir,
-                    "File {0} at location {1} has possible bad exif data. Error: {2}".format(
-                        file, file_dir, ex
-                    ),
+                    f"File {file} at location {file_dir} has possible bad exif data. Error: {ex}",
                 )
             except PermissionError as pe:
                 logger.error(
-                    "PermissionError: Could not remove file {0} at location {1}. Error: {2}".format(
-                        file, file_dir, pe
-                    )
+                    "PermissionError: Could not remove file %s at location %s. Error: %s",
+                    file,
+                    file_dir,
+                    pe,
                 )
                 # Additional debugging information
                 logger.debug("Checking if file is closed properly.")
@@ -99,4 +96,4 @@ def organize():
                     with open(file_dir, "rb") as f:
                         pass
                 except Exception as e:
-                    logger.error("Error while checking file: {0}".format(e))
+                    logger.error("Error while checking file: %s", e)
