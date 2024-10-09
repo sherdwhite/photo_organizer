@@ -2,14 +2,15 @@ import logging
 import platform
 from logging.config import dictConfig
 from pathlib import Path
+from typing import Optional
 
 FORMAT = "%(asctime)s {app} [%(thread)d] %(levelname)-5s %(name)s - %(message)s. [file=%(filename)s:%(lineno)d]"
 DATE_FORMAT = None
 
 
 def setup_logging(
-    name: str, level: str = "INFO", fmt: str = FORMAT, log_dir: str = None
-):
+    name: str, level: str = "INFO", fmt: str = FORMAT, log_dir: Optional[str] = None
+) -> None:
     formatted = fmt.format(app=name)
 
     if log_dir is None:

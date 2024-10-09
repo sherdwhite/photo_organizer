@@ -3,6 +3,7 @@ import os
 import shutil
 from datetime import datetime
 from struct import error as UnpackError
+from typing import Any, Dict, Optional
 
 from photo_organizer.error_handling import log_and_handle_error
 from photo_organizer.exif import extract_exif_data
@@ -18,7 +19,7 @@ from photo_organizer.utils import parse_args
 logger = logging.getLogger(__name__)
 
 
-def organize():
+def organize() -> None:
     """
     Organizes photos by moving them into directories based on their creation date.
 
@@ -29,9 +30,9 @@ def organize():
     the photo or video was taken. If a file does not have EXIF data or its creation date cannot be
     determined, an error is logged and the file is moved to an `Unknown` directory.
     """
-    dirs = parse_args()
-    origin_dir = dirs.get("origin_dir")
-    destination_dir = dirs.get("destination_dir")
+    dirs: Dict[str, Any] = parse_args()
+    origin_dir: Optional[str] = dirs.get("origin_dir")
+    destination_dir: Optional[str] = dirs.get("destination_dir")
     logger.info("Origin Directory: %s", origin_dir)
     logger.info("Destination Directory: %s", destination_dir)
 
@@ -46,7 +47,7 @@ def organize():
                 continue
             print(f"At file: {file_dir}")
             try:
-                datetime_original = None
+                datetime_original: Optional[str] = None
                 if file.lower().endswith(".mov"):
                     datetime_original = extract_mov_creation_date(file_dir)
                 elif file.lower().endswith(".png"):
@@ -66,11 +67,15 @@ def organize():
                         datetime_original = extract_exif_data(image_file)
 
                 if datetime_original:
-                    date = datetime.strptime(datetime_original, "%Y:%m:%d %H:%M:%S")
-                    year = date.year
-                    month = str(date.month).zfill(2)
-                    folder_destination = os.path.join(destination_dir, str(year), month)
-                    file_destination = os.path.join(folder_destination, file)
+                    date: datetime = datetime.strptime(
+                        datetime_original, "%Y:%m:%d %H:%M:%S"
+                    )
+                    year: int = date.year
+                    month: str = str(date.month).zfill(2)
+                    folder_destination: str = os.path.join(
+                        destination_dir, str(year), month
+                    )
+                    file_destination: str = os.path.join(folder_destination, file)
                     if not os.path.exists(folder_destination):
                         os.makedirs(folder_destination)
                     if not os.path.exists(file_destination):

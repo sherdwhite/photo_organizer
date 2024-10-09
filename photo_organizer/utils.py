@@ -1,10 +1,11 @@
 import argparse
 import logging
+from typing import Dict
 
 logger = logging.getLogger(__name__)
 
 
-def parse_args():
+def parse_args() -> Dict[str, str]:
     parser = argparse.ArgumentParser(description="Organize photos by EXIF data.")
     parser.add_argument(
         "-o",

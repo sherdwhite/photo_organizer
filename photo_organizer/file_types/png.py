@@ -1,11 +1,12 @@
 import logging
+from typing import Optional
 
 from PIL import Image as PILImage
 
 logger = logging.getLogger(__name__)
 
 
-def extract_png_creation_date(file_path):
+def extract_png_creation_date(file_path: str) -> Optional[str]:
     try:
         img = PILImage.open(file_path)
         info = img.info

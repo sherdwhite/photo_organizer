@@ -1,11 +1,12 @@
 import logging
+from typing import Optional
 
 from PIL import Image as PILImage
 
 logger = logging.getLogger(__name__)
 
 
-def extract_gif_creation_date(file_path):
+def extract_gif_creation_date(file_path: str) -> Optional[str]:
     try:
         img = PILImage.open(file_path)
         info = img.info
@@ -14,5 +15,5 @@ def extract_gif_creation_date(file_path):
         elif "date:modify" in info:
             return info["date:modify"]
     except Exception as e:
-        logger.error(f"Error extracting GIF creation date: {e}")
+        logger.error("Error extracting GIF creation date: %s", e)
     return None
