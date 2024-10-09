@@ -19,6 +19,16 @@ logger = logging.getLogger(__name__)
 
 
 def organize():
+    """
+    Organizes photos by moving them into directories based on their creation date.
+
+    This function scans a specified origin directory for photo and video files, reads their EXIF
+    data if available or retrieves the creation dates from the file metadata for specific file
+    types, such as MOV, PNG, AVI, MP4, 3GP, GIF, and M4V. It then moves them into subdirectories
+    within a specified destination directory. The subdirectories are named after the year and month
+    the photo or video was taken. If a file does not have EXIF data or its creation date cannot be
+    determined, an error is logged and the file is moved to an `Unknown` directory.
+    """
     dirs = parse_args()
     origin_dir = dirs.get("origin_dir")
     destination_dir = dirs.get("destination_dir")
