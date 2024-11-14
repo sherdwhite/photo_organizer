@@ -1,4 +1,3 @@
-import logging
 import platform
 from logging.config import dictConfig
 from pathlib import Path

@@ -19,7 +19,9 @@ from photo_organizer.utils import parse_args
 logger = logging.getLogger(__name__)
 
 
-def organize() -> None:
+def organize(
+    origin_dir: Optional[str] = None, destination_dir: Optional[str] = None
+) -> None:
     """
     Organizes photos by moving them into directories based on their creation date.
 
@@ -29,10 +31,14 @@ def organize() -> None:
     within a specified destination directory. The subdirectories are named after the year and month
     the photo or video was taken. If a file does not have EXIF data or its creation date cannot be
     determined, an error is logged and the file is moved to an `Unknown` directory.
+
+    Parameters:
+    origin_dir (Optional[str]): The directory to scan for photos and videos.
+    destination_dir (Optional[str]): The directory to move organized photos and videos to.
     """
     dirs: Dict[str, Any] = parse_args()
-    origin_dir: Optional[str] = dirs.get("origin_dir")
-    destination_dir: Optional[str] = dirs.get("destination_dir")
+    origin_dir = origin_dir or dirs.get("origin_dir")
+    destination_dir = destination_dir or dirs.get("destination_dir")
     logger.info("Origin Directory: %s", origin_dir)
     logger.info("Destination Directory: %s", destination_dir)
 
