@@ -96,6 +96,27 @@ destination_folder/
 pytest photo_organizer/tests/
 ```
 
+### Development Helper
+
+Use the development script for common tasks:
+
+```bash
+# Run tests
+python dev.py test
+
+# Create test data for GUI testing
+python dev.py testdata
+
+# Launch GUI for testing
+python dev.py gui
+
+# Run CLI with test data
+python dev.py cli
+
+# Run linting (if available)
+python dev.py lint
+```
+
 ### Project Structure
 
 ```
@@ -108,16 +129,17 @@ photo_organizer/
 │   ├── utils.py             # Command line argument parsing
 │   ├── error_handling.py    # Error handling utilities
 │   ├── log.py               # Logging configuration
-│   ├── file_types/          # File-specific extractors
-│   │   ├── mov.py
-│   │   ├── mp4.py
-│   │   ├── png.py
-│   │   └── ...
+│   ├── file_operations.py   # File system operations
+│   ├── file_types/          # Consolidated file extractors
+│   │   ├── __init__.py      # Unified registry interface
+│   │   ├── video_extractors.py  # Video formats (MOV, MP4, AVI, M4V, 3GP)
+│   │   └── image_extractors.py  # Image formats (PNG, GIF)
 │   └── tests/               # Test suite
 ├── gui/                     # GUI application
 │   └── photo_organizer_gui.py
 ├── run.py                   # Main launcher
 ├── launch_gui.py           # GUI-only launcher
+├── dev.py                  # Development helper script
 └── requirements.txt        # Dependencies
 ```
 
