@@ -106,3 +106,6 @@ venv.bak/
 # mypy
 .mypy_cache/
 /.history
+
+# Project-specific files
+photo_organizer.log*

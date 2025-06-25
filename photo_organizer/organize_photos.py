@@ -14,6 +14,7 @@ from photo_organizer.file_types.mov import extract_mov_creation_date
 from photo_organizer.file_types.mp4 import extract_mp4_creation_date
 from photo_organizer.file_types.png import extract_png_creation_date
 from photo_organizer.file_types.threegp import extract_3gp_creation_date
+from photo_organizer.log import setup_logging
 from photo_organizer.utils import parse_args
 
 logger = logging.getLogger(__name__)
@@ -145,6 +146,12 @@ def organize(
     dirs: Dict[str, Any] = parse_args()
     origin_dir = origin_dir or dirs.get("origin_dir")
     destination_dir = destination_dir or dirs.get("destination_dir")
+
+    # Set up dynamic logging to destination directory if available
+    if destination_dir:
+        setup_logging("photo_organizer", log_dir=destination_dir)
+        logger.info("Logging configured to destination directory: %s", destination_dir)
+
     logger.info("Origin Directory: %s", origin_dir)
     logger.info("Destination Directory: %s", destination_dir)
 

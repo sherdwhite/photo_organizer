@@ -1,1 +1,1 @@
-__version__ = '0.1'  # major.minor
+__version__ = "0.3"  # major.minor
