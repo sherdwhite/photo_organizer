@@ -7,28 +7,14 @@ from typing import Any, Dict, Optional
 
 from photo_organizer.error_handling import log_and_handle_error
 from photo_organizer.exif import extract_exif_data
-from photo_organizer.file_types.avi import extract_avi_creation_date
-from photo_organizer.file_types.gif import extract_gif_creation_date
-from photo_organizer.file_types.m4v import extract_m4v_creation_date
-from photo_organizer.file_types.mov import extract_mov_creation_date
-from photo_organizer.file_types.mp4 import extract_mp4_creation_date
-from photo_organizer.file_types.png import extract_png_creation_date
-from photo_organizer.file_types.threegp import extract_3gp_creation_date
+from photo_organizer.file_types import ALL_EXTRACTORS
 from photo_organizer.log import setup_logging
 from photo_organizer.utils import parse_args
 
 logger = logging.getLogger(__name__)
 
-# File type to extraction function mapping
-FILE_TYPE_EXTRACTORS = {
-    ".mov": extract_mov_creation_date,
-    ".png": extract_png_creation_date,
-    ".avi": extract_avi_creation_date,
-    ".mp4": extract_mp4_creation_date,
-    ".3gp": extract_3gp_creation_date,
-    ".gif": extract_gif_creation_date,
-    ".m4v": extract_m4v_creation_date,
-}
+# Use the consolidated extractors registry
+FILE_TYPE_EXTRACTORS = ALL_EXTRACTORS
 
 # Files to be deleted automatically
 FILES_TO_DELETE = {"thumbs.db", "desktop"}
@@ -46,21 +32,10 @@ def get_file_creation_date(file_path: str) -> Optional[str]:
     """
     file_ext = os.path.splitext(file_path)[1].lower()
 
-    # Try specific file type extractors first
-    if file_ext == ".mov":
-        return extract_mov_creation_date(file_path)
-    elif file_ext == ".png":
-        return extract_png_creation_date(file_path)
-    elif file_ext == ".avi":
-        return extract_avi_creation_date(file_path)
-    elif file_ext == ".mp4":
-        return extract_mp4_creation_date(file_path)
-    elif file_ext == ".3gp":
-        return extract_3gp_creation_date(file_path)
-    elif file_ext == ".gif":
-        return extract_gif_creation_date(file_path)
-    elif file_ext == ".m4v":
-        return extract_m4v_creation_date(file_path)
+    # Try specific file type extractors first using the registry
+    if file_ext in FILE_TYPE_EXTRACTORS:
+        extractor_func = FILE_TYPE_EXTRACTORS[file_ext]
+        return extractor_func(file_path)
     else:
         # Fall back to EXIF data for other image types
         try:
