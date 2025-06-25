@@ -1,5 +1,6 @@
 exif==1.6.0
 gevent==24.2.1
 hachoir==3.3.0
+PyQt6==6.7.1
 pillow==10.4.0
 pytest==8.3.3
