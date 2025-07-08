@@ -20,7 +20,21 @@ git clone https://github.com/yourusername/photo_organizer.git
 cd photo_organizer
 ```
 
-2. Install dependencies:
+2. Create and activate a virtual environment (recommended):
+```bash
+# Create virtual environment
+python -m venv venv
+
+# Activate virtual environment
+# On Windows (Git Bash):
+source venv/Scripts/activate
+# On Windows (Command Prompt):
+venv\Scripts\activate
+# On macOS/Linux:
+source venv/bin/activate
+```
+
+3. Install dependencies:
 ```bash
 pip install -r requirements.txt
 ```

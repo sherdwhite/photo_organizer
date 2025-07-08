@@ -3,13 +3,12 @@ import os
 import shutil
 from datetime import datetime
 from struct import error as UnpackError
-from typing import Any, Dict, Optional
+from typing import Optional
 
 from photo_organizer.error_handling import log_and_handle_error
 from photo_organizer.exif import extract_exif_data
 from photo_organizer.file_types import ALL_EXTRACTORS
 from photo_organizer.log import setup_logging
-from photo_organizer.utils import parse_args
 
 logger = logging.getLogger(__name__)
 
@@ -118,9 +117,13 @@ def organize(
     destination_dir (Optional[str]): The directory to move organized photos
                                    and videos to.
     """
-    dirs: Dict[str, Any] = parse_args()
-    origin_dir = origin_dir or dirs.get("origin_dir")
-    destination_dir = destination_dir or dirs.get("destination_dir")
+    # Use default directories if not provided
+    if origin_dir is None or destination_dir is None:
+        from photo_organizer.utils import get_default_pictures_directory
+
+        default_pictures = get_default_pictures_directory()
+        origin_dir = origin_dir or os.path.join(default_pictures, "Unsorted")
+        destination_dir = destination_dir or os.path.join(default_pictures, "Organized")
 
     # Set up dynamic logging to destination directory if available
     if destination_dir:
