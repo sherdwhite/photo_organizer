@@ -30,11 +30,30 @@ class LogHandler(logging.Handler):
     def __init__(self, text_widget):
         super().__init__()
         self.text_widget = text_widget
+        self.message_count = 0
+        self.max_messages = 1000  # Limit messages to prevent memory issues
 
     def emit(self, record):
         """Emit log record to the text widget."""
-        msg = self.format(record)
-        self.text_widget.append(msg)
+        try:
+            # Limit the number of messages to prevent memory issues
+            if self.message_count >= self.max_messages:
+                # Clear half the messages when limit is reached
+                self.text_widget.clear()
+                self.text_widget.append(
+                    "... (Log cleared to prevent memory issues) ..."
+                )
+                self.message_count = 1
+
+            msg = self.format(record)
+
+            # Only add INFO level and above messages to reduce noise
+            if record.levelno >= logging.INFO:
+                self.text_widget.append(msg)
+                self.message_count += 1
+        except Exception:
+            # Silently ignore errors to prevent crashes
+            pass
 
 
 class OrganizerWorker(QThread):
@@ -52,12 +71,28 @@ class OrganizerWorker(QThread):
     def run(self):
         """Run the photo organization in a separate thread."""
         try:
+            # Reduce logging level to prevent overwhelming the GUI
+            logging.getLogger("photo_organizer").setLevel(logging.WARNING)
+
             self.progress.emit("Starting photo organization...")
-            organize(self.origin_dir, self.destination_dir)
+
+            # Define progress callback
+            def progress_callback(message):
+                self.progress.emit(message)
+
+            # Run the organization process with progress callback
+            organize(self.origin_dir, self.destination_dir, progress_callback)
+
             self.progress.emit("Photo organization completed successfully!")
             self.finished.emit()
+
         except Exception as e:
+            error_msg = f"Error during photo organization: {str(e)}"
+            self.progress.emit(error_msg)
             self.error.emit(str(e))
+        finally:
+            # Restore normal logging level
+            logging.getLogger("photo_organizer").setLevel(logging.INFO)
 
 
 class PhotoOrganizerGUI(QMainWindow):
@@ -180,7 +215,7 @@ class PhotoOrganizerGUI(QMainWindow):
         """Set up logging to redirect to the GUI text widget."""
         # Create custom handler for GUI
         self.log_handler = LogHandler(self.log_text)
-        self.log_handler.setLevel(logging.INFO)
+        self.log_handler.setLevel(logging.WARNING)  # Only show warnings and errors
 
         # Format the log messages
         formatter = logging.Formatter(
@@ -188,10 +223,13 @@ class PhotoOrganizerGUI(QMainWindow):
         )
         self.log_handler.setFormatter(formatter)
 
-        # Add handler to root logger
-        root_logger = logging.getLogger()
-        root_logger.addHandler(self.log_handler)
-        root_logger.setLevel(logging.INFO)
+        # Add handler to photo_organizer specific loggers only
+        photo_organizer_logger = logging.getLogger("photo_organizer")
+        photo_organizer_logger.addHandler(self.log_handler)
+        photo_organizer_logger.setLevel(logging.INFO)
+
+        # Prevent propagation to root logger to avoid duplicate messages
+        photo_organizer_logger.propagate = False
 
     def browse_origin_directory(self):
         """Open dialog to select origin directory."""

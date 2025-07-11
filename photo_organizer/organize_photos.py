@@ -9,6 +9,7 @@ from photo_organizer.error_handling import log_and_handle_error
 from photo_organizer.exif import extract_exif_data
 from photo_organizer.file_types import ALL_EXTRACTORS
 from photo_organizer.log import setup_logging
+from photo_organizer.utils import get_default_pictures_directory
 
 logger = logging.getLogger(__name__)
 
@@ -98,7 +99,9 @@ def move_file_safely(source_path: str, dest_path: str, filename: str) -> bool:
 
 
 def organize(
-    origin_dir: Optional[str] = None, destination_dir: Optional[str] = None
+    origin_dir: Optional[str] = None,
+    destination_dir: Optional[str] = None,
+    progress_callback=None,
 ) -> None:
     """
     Organizes photos by moving them into directories based on their creation date.
@@ -116,11 +119,10 @@ def organize(
     origin_dir (Optional[str]): The directory to scan for photos and videos.
     destination_dir (Optional[str]): The directory to move organized photos
                                    and videos to.
+    progress_callback (Optional[callable]): Callback function for progress updates.
     """
     # Use default directories if not provided
     if origin_dir is None or destination_dir is None:
-        from photo_organizer.utils import get_default_pictures_directory
-
         default_pictures = get_default_pictures_directory()
         origin_dir = origin_dir or os.path.join(default_pictures, "Unsorted")
         destination_dir = destination_dir or os.path.join(default_pictures, "Organized")
@@ -145,6 +147,11 @@ def organize(
                 file_path = os.path.join(root, file)
                 files_to_process.append((file_path, file))
 
+    total_files = len(files_to_process)
+    logger.info("Found %d files to process", total_files)
+    if progress_callback:
+        progress_callback(f"Found {total_files} files to process")
+
     # Remove empty directories
     for empty_dir in empty_dirs:
         try:
@@ -154,7 +161,13 @@ def organize(
             logger.warning("Could not remove directory %s: %s", empty_dir, e)
 
     # Process files
+    processed_count = 0
+    moved_count = 0
+    error_count = 0
+
     for file_path, filename in files_to_process:
+        processed_count += 1
+
         # Skip files that should be deleted
         if should_skip_file(filename):
             try:
@@ -164,7 +177,15 @@ def organize(
                 logger.error("Could not delete file %s: %s", file_path, e)
             continue
 
-        logger.info("Processing file: %s", file_path)
+        # Only log every 50th file to reduce log spam
+        if processed_count % 50 == 0 or processed_count == total_files:
+            logger.info(
+                "Processing file %d/%d: %s", processed_count, total_files, filename
+            )
+            if progress_callback:
+                progress_callback(
+                    f"Processing file {processed_count}/{total_files}: {filename}"
+                )
 
         try:
             creation_date = get_file_creation_date(file_path)
@@ -173,10 +194,14 @@ def organize(
                 dest_folder = create_destination_path(creation_date, destination_dir)
 
                 if move_file_safely(file_path, dest_folder, filename):
-                    logger.info("Successfully moved %s to %s", filename, dest_folder)
+                    moved_count += 1
+                    # Only log successful moves occasionally
+                    if moved_count % 100 == 0:
+                        logger.info("Successfully moved %d files so far", moved_count)
                 else:
                     # Check if file still exists (move_file_safely handles most errors)
                     if os.path.exists(file_path):
+                        error_count += 1
                         log_and_handle_error(
                             destination_dir,
                             filename,
@@ -184,6 +209,7 @@ def organize(
                             f"Failed to move file {filename}",
                         )
             else:
+                error_count += 1
                 log_and_handle_error(
                     destination_dir,
                     filename,
@@ -192,6 +218,7 @@ def organize(
                 )
 
         except (ValueError, UnpackError) as ex:
+            error_count += 1
             log_and_handle_error(
                 destination_dir,
                 filename,
@@ -199,4 +226,17 @@ def organize(
                 f"File {filename} has invalid metadata. Error: {ex}",
             )
         except (OSError, IOError, PermissionError) as ex:
+            error_count += 1
             logger.error("Error processing file %s: %s", file_path, ex)
+
+    # Final summary
+    logger.info(
+        "Organization complete: %d files processed, %d moved, %d errors",
+        processed_count,
+        moved_count,
+        error_count,
+    )
+    if progress_callback:
+        progress_callback(
+            f"Complete: {processed_count} files processed, {moved_count} moved, {error_count} errors"
+        )
