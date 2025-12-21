@@ -1,7 +1,11 @@
 import logging
+import warnings
 from typing import BinaryIO, Optional
 
 from exif import Image
+
+# Suppress RuntimeWarnings from the exif library (corrupted EXIF data)
+warnings.filterwarnings("ignore", category=RuntimeWarning, module="exif")
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +39,14 @@ def extract_exif_data(image_file: BinaryIO) -> Optional[str]:
         logger.debug("No creation date found in EXIF data")
         return None
 
-    except (ValueError, KeyError, AttributeError) as e:
+    except ValueError as e:
+        # Handle corrupted EXIF data (e.g., invalid TIFF byte order)
+        logger.debug("File has corrupted or invalid EXIF data: %s", str(e))
+        return None
+    except (KeyError, AttributeError) as e:
         logger.error("Error extracting EXIF data: %s", e)
+        return None
+    except Exception as e:
+        # Catch any other unexpected errors from the exif library
+        logger.warning("Unexpected error reading EXIF data: %s", str(e))
         return None

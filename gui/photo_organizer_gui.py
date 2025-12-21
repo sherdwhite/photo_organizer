@@ -1,10 +1,11 @@
 import logging
 import os
 import sys
+import traceback
 
-from PyQt6.QtCore import Qt, QThread, pyqtSignal
-from PyQt6.QtGui import QFont
-from PyQt6.QtWidgets import (
+from PyQt5.QtCore import Qt, QThread, pyqtSignal
+from PyQt5.QtGui import QFont
+from PyQt5.QtWidgets import (
     QApplication,
     QFileDialog,
     QGridLayout,
@@ -22,6 +23,34 @@ from PyQt6.QtWidgets import (
 )
 
 from photo_organizer.organize_photos import organize
+
+logger = logging.getLogger(__name__)
+
+
+def exception_hook(exc_type, exc_value, exc_traceback):
+    """Global exception handler to log unhandled exceptions."""
+    if issubclass(exc_type, KeyboardInterrupt):
+        sys.__excepthook__(exc_type, exc_value, exc_traceback)
+        return
+
+    error_msg = "".join(traceback.format_exception(exc_type, exc_value, exc_traceback))
+    logger.error(f"Unhandled exception:\n{error_msg}")
+
+    # Write to crash log
+    try:
+        crash_log = os.path.join(os.getcwd(), "gui_crash.log")
+        with open(crash_log, "a") as f:
+            f.write(f"\n{'='*80}\n")
+            f.write(f"Unhandled Exception at {os.popen('date').read().strip()}\n")
+            f.write(f"{'='*80}\n")
+            f.write(error_msg)
+        print(f"Exception logged to: {crash_log}", file=sys.stderr)
+    except Exception:
+        pass
+
+
+# Install global exception hook
+sys.excepthook = exception_hook
 
 
 class LogHandler(logging.Handler):
@@ -121,7 +150,7 @@ class PhotoOrganizerGUI(QMainWindow):
         title_font.setPointSize(18)
         title_font.setBold(True)
         title_label.setFont(title_font)
-        title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        title_label.setAlignment(Qt.AlignCenter)
         main_layout.addWidget(title_label)
 
         # Directory selection group
@@ -353,11 +382,11 @@ class PhotoOrganizerGUI(QMainWindow):
                 self,
                 "Close Application",
                 "Photo organization is in progress. Are you sure you want to exit?",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                QMessageBox.StandardButton.No,
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No,
             )
 
-            if reply == QMessageBox.StandardButton.Yes:
+            if reply == QMessageBox.Yes:
                 self.worker.terminate()
                 self.worker.wait()
                 event.accept()
@@ -369,16 +398,45 @@ class PhotoOrganizerGUI(QMainWindow):
 
 def run_gui():
     """Run the Photo Organizer GUI application."""
-    app = QApplication(sys.argv)
-    app.setApplicationName("Photo Organizer")
+    try:
+        logger.info("Initializing QApplication...")
+        app = QApplication(sys.argv)
+        app.setApplicationName("Photo Organizer")
+        logger.info("QApplication initialized successfully")
 
-    # Set application style
-    app.setStyle("Fusion")
+        # Set application style
+        logger.info("Setting application style...")
+        app.setStyle("Fusion")
+        logger.info("Application style set successfully")
 
-    window = PhotoOrganizerGUI()
-    window.show()
+        logger.info("Creating PhotoOrganizerGUI window...")
+        window = PhotoOrganizerGUI()
+        logger.info("Window created successfully")
 
-    return app.exec()
+        logger.info("Showing window...")
+        window.show()
+        logger.info("Window shown successfully")
+
+        logger.info("Starting event loop...")
+        return app.exec()
+
+    except Exception as e:
+        error_msg = (
+            f"Fatal error during GUI initialization: {e}\n{traceback.format_exc()}"
+        )
+        logger.error(error_msg)
+        print(error_msg, file=sys.stderr)
+
+        # Try to write to a crash log file
+        try:
+            crash_log = os.path.join(os.getcwd(), "gui_crash.log")
+            with open(crash_log, "w") as f:
+                f.write(error_msg)
+            print(f"\nCrash details written to: {crash_log}")
+        except Exception as log_error:
+            print(f"Could not write crash log: {log_error}")
+
+        return 1
 
 
 if __name__ == "__main__":

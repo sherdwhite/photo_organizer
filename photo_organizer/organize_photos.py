@@ -1,5 +1,6 @@
 import logging
 import os
+import re
 import shutil
 from datetime import datetime
 from struct import error as UnpackError
@@ -20,6 +21,59 @@ FILE_TYPE_EXTRACTORS = ALL_EXTRACTORS
 FILES_TO_DELETE = {"thumbs.db", "desktop"}
 
 
+def extract_date_from_filename(filename: str) -> Optional[str]:
+    """
+    Extract date from filename patterns like IMG_20250808_090022.jpg.
+
+    Supports patterns:
+    - IMG_YYYYMMDD_HHMMSS.ext
+    - YYYYMMDD_HHMMSS.ext
+    - IMG-YYYYMMDD-HHMMSS.ext
+    - YYYY-MM-DD_HH-MM-SS.ext
+    - And variations with different separators
+
+    Args:
+        filename: Name of the file (not the full path)
+
+    Returns:
+        Creation date string in format "YYYY:MM:DD HH:MM:SS" or None
+    """
+    # Remove file extension
+    name_without_ext = os.path.splitext(filename)[0]
+
+    # Pattern 1: IMG_20250808_090022 or similar (YYYYMMDD_HHMMSS)
+    pattern1 = r"(\d{4})(\d{2})(\d{2})[_-](\d{2})(\d{2})(\d{2})"
+    match = re.search(pattern1, name_without_ext)
+    if match:
+        year, month, day, hour, minute, second = match.groups()
+        try:
+            # Validate the date
+            dt = datetime(
+                int(year), int(month), int(day), int(hour), int(minute), int(second)
+            )
+            result = dt.strftime("%Y:%m:%d %H:%M:%S")
+            logger.debug("Extracted date from filename %s: %s", filename, result)
+            return result
+        except ValueError:
+            pass
+
+    # Pattern 2: YYYY-MM-DD or YYYYMMDD (date only, no time)
+    pattern2 = r"(\d{4})[_-]?(\d{2})[_-]?(\d{2})"
+    match = re.search(pattern2, name_without_ext)
+    if match:
+        year, month, day = match.groups()
+        try:
+            # Validate the date and set time to noon
+            dt = datetime(int(year), int(month), int(day), 12, 0, 0)
+            result = dt.strftime("%Y:%m:%d %H:%M:%S")
+            logger.debug("Extracted date from filename %s: %s", filename, result)
+            return result
+        except ValueError:
+            pass
+
+    return None
+
+
 def get_file_creation_date(file_path: str) -> Optional[str]:
     """
     Extract creation date from file based on its extension.
@@ -31,19 +85,31 @@ def get_file_creation_date(file_path: str) -> Optional[str]:
         Creation date string in format "YYYY:MM:DD HH:MM:SS" or None
     """
     file_ext = os.path.splitext(file_path)[1].lower()
+    filename = os.path.basename(file_path)
 
     # Try specific file type extractors first using the registry
     if file_ext in FILE_TYPE_EXTRACTORS:
         extractor_func = FILE_TYPE_EXTRACTORS[file_ext]
-        return extractor_func(file_path)
+        date = extractor_func(file_path)
+        if date:
+            return date
     else:
         # Fall back to EXIF data for other image types
         try:
             with open(file_path, "rb") as image_file:
-                return extract_exif_data(image_file)
-        except (OSError, IOError) as e:
+                date = extract_exif_data(image_file)
+                if date:
+                    return date
+        except (OSError, IOError, ValueError) as e:
             logger.warning("Could not read file %s: %s", file_path, e)
-            return None
+
+    # If no date found from metadata, try parsing the filename
+    date = extract_date_from_filename(filename)
+    if date:
+        logger.info("Using date from filename for %s: %s", filename, date)
+        return date
+
+    return None
 
 
 def should_skip_file(filename: str) -> bool:

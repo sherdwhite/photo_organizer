@@ -34,7 +34,19 @@ venv\Scripts\activate
 source venv/bin/activate
 ```
 
-3. Install dependencies:
+3. Install system dependencies (Fedora/RHEL):
+```bash
+# Required for building gevent's C extensions
+sudo dnf install gcc python3-devel
+```
+
+> **Note for Fedora/RHEL users**: The `gevent` package requires compiling C extensions. You must install `gcc` and `python3-devel` before running pip install.
+>
+> **For other Linux distributions**:
+> - Debian/Ubuntu: `sudo apt install build-essential python3-dev`
+> - Arch: `sudo pacman -S base-devel`
+
+4. Install Python dependencies:
 ```bash
 pip install -r requirements.txt
 ```
