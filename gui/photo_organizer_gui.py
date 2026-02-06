@@ -25,6 +25,8 @@ from PyQt5.QtWidgets import (
 
 from photo_organizer.organize_photos import organize
 
+# ── Module-level setup ───────────────────────────────────────────────
+
 # Register QTextCursor so queued signal-slot connections that
 # involve it internally (e.g. QTextEdit) don't produce the
 # "Cannot queue arguments of type 'QTextCursor'" warning.
@@ -35,6 +37,9 @@ QMetaType.type("QTextCursor")
 faulthandler.enable()
 
 logger = logging.getLogger(__name__)
+
+
+# ── Global exception handling ────────────────────────────────────────
 
 
 def exception_hook(exc_type, exc_value, exc_traceback):
@@ -80,6 +85,9 @@ def exception_hook(exc_type, exc_value, exc_traceback):
 
 # Install global exception hook
 sys.excepthook = exception_hook
+
+
+# ── Logging infrastructure ───────────────────────────────────────────
 
 
 class LogSignalBridge(QObject):
@@ -141,6 +149,9 @@ class LogHandler(logging.Handler):
             pass
 
 
+# ── Worker thread ────────────────────────────────────────────────────
+
+
 class OrganizerWorker(QThread):
     """Worker thread for organizing photos to avoid blocking the GUI."""
 
@@ -181,8 +192,13 @@ class OrganizerWorker(QThread):
             logging.getLogger("photo_organizer").setLevel(logging.INFO)
 
 
+# ── Main window ──────────────────────────────────────────────────────
+
+
 class PhotoOrganizerGUI(QMainWindow):
     """Main GUI window for the Photo Organizer application."""
+
+    # ── Initialization ───────────────────────────────────────────────
 
     def __init__(self):
         super().__init__()
@@ -325,6 +341,8 @@ class PhotoOrganizerGUI(QMainWindow):
         # Prevent propagation to root logger to avoid duplicate messages
         photo_organizer_logger.propagate = False
 
+    # ── User actions (button / dialog handlers) ──────────────────────
+
     def browse_origin_directory(self):
         """Open dialog to select origin directory."""
         directory = QFileDialog.getExistingDirectory(
@@ -413,6 +431,13 @@ class PhotoOrganizerGUI(QMainWindow):
         self.worker.progress.connect(self.on_progress_update)
         self.worker.start()
 
+    def clear_log(self):
+        """Clear the log text area."""
+        self.log_text.clear()
+        self.statusBar().showMessage("Log cleared")
+
+    # ── Worker signal handlers ───────────────────────────────────────
+
     def on_organization_finished(self):
         """Handle completion of photo organization."""
         self.organize_btn.setEnabled(True)
@@ -465,10 +490,7 @@ class PhotoOrganizerGUI(QMainWindow):
         if not message.startswith("Processing file "):
             self.log_text.append(message)
 
-    def clear_log(self):
-        """Clear the log text area."""
-        self.log_text.clear()
-        self.statusBar().showMessage("Log cleared")
+    # ── Qt event overrides ───────────────────────────────────────────
 
     def closeEvent(self, event):
         """Handle application close event."""
@@ -489,6 +511,9 @@ class PhotoOrganizerGUI(QMainWindow):
                 event.ignore()
         else:
             event.accept()
+
+
+# ── Entry point ──────────────────────────────────────────────────────
 
 
 def run_gui():
