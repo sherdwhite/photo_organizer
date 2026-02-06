@@ -1,7 +1,6 @@
 import logging
 import os
 import re
-import shutil
 from datetime import datetime
 from struct import error as UnpackError
 from typing import Optional
@@ -13,6 +12,11 @@ from photo_organizer.date_utils import (
 )
 from photo_organizer.error_handling import log_and_handle_error
 from photo_organizer.exif import extract_exif_data, extract_exif_via_pillow
+from photo_organizer.file_operations import (
+    create_destination_path,
+    move_file_safely,
+    should_skip_file,
+)
 from photo_organizer.file_types import ALL_EXTRACTORS
 from photo_organizer.file_types.video_extractors import VIDEO_EXTRACTORS
 from photo_organizer.log import setup_logging
@@ -25,9 +29,6 @@ FILE_TYPE_EXTRACTORS = ALL_EXTRACTORS
 
 # Extensions where EXIF / Pillow fallbacks are pointless (video files)
 _VIDEO_EXTENSIONS = frozenset(VIDEO_EXTRACTORS.keys())
-
-# Files to be deleted automatically
-FILES_TO_DELETE = {"thumbs.db", "desktop"}
 
 
 def extract_date_from_filename(filename: str) -> Optional[str]:
@@ -264,58 +265,6 @@ def _cross_reference_dates(
             )
     except (ValueError, TypeError):
         pass  # Can't compare — not worth logging
-
-
-def should_skip_file(filename: str) -> bool:
-    """Check if file should be skipped (deleted or ignored)."""
-    return filename.lower() in FILES_TO_DELETE
-
-
-def create_destination_path(creation_date: str, destination_dir: str) -> str:
-    """
-    Create destination folder path based on creation date.
-
-    Args:
-        creation_date: Date string in format "YYYY:MM:DD HH:MM:SS"
-        destination_dir: Base destination directory
-
-    Returns:
-        Full path to destination folder
-    """
-    date = datetime.strptime(creation_date, "%Y:%m:%d %H:%M:%S")
-    year = date.year
-    month = str(date.month).zfill(2)
-    return os.path.join(destination_dir, str(year), month)
-
-
-def move_file_safely(source_path: str, dest_path: str, filename: str) -> bool:
-    """
-    Safely move file to destination, handling duplicates.
-
-    Args:
-        source_path: Source file path
-        dest_path: Destination directory path
-        filename: Name of the file
-
-    Returns:
-        True if successful, False otherwise
-    """
-    os.makedirs(dest_path, exist_ok=True)
-    file_destination = os.path.join(dest_path, filename)
-
-    try:
-        if not os.path.exists(file_destination):
-            logger.debug("Moving file %s to %s", filename, file_destination)
-            shutil.move(source_path, file_destination)
-        else:
-            logger.info(
-                "File %s already exists at destination, removing source", filename
-            )
-            os.remove(source_path)
-        return True
-    except (OSError, IOError, PermissionError) as e:
-        logger.error("Failed to move file %s: %s", source_path, e)
-        return False
 
 
 def organize(

@@ -8,8 +8,12 @@ directory creation, duplicate handling, and cleanup operations.
 import logging
 import os
 import shutil
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
+
+# Files to be deleted automatically during organization
+FILES_TO_DELETE = {"thumbs.db", "desktop"}
 
 
 class FileOperationError(Exception):
@@ -27,10 +31,12 @@ def create_destination_path(creation_date: str, destination_dir: str) -> str:
         destination_dir: Base destination directory
 
     Returns:
-        Full path to destination folder
+        Full path to destination folder (e.g. dest/2023/01)
     """
     try:
-        year, month, _ = creation_date.split(":")[:3]
+        date = datetime.strptime(creation_date, "%Y:%m:%d %H:%M:%S")
+        year = str(date.year)
+        month = str(date.month).zfill(2)
         return os.path.join(destination_dir, year, month)
     except (ValueError, IndexError) as e:
         logger.error("Invalid date format '%s': %s", creation_date, e)
@@ -54,37 +60,39 @@ def ensure_directory_exists(directory_path: str) -> None:
         raise FileOperationError(f"Cannot create directory {directory_path}: {e}")
 
 
-def move_file_safely(source_path: str, dest_path: str, filename: str) -> bool:
+def move_file_safely(source_path: str, dest_dir: str, filename: str) -> bool:
     """
-    Safely move a file, handling duplicates and errors.
+    Safely move a file to a destination directory.
+
+    Handles duplicate filenames by appending a counter
+    (e.g. photo_1.jpg, photo_2.jpg).
 
     Args:
-        source_path: Source file path
-        dest_path: Destination file path
-        filename: Original filename for logging
+        source_path: Full path of the source file
+        dest_dir: Destination directory path
+        filename: Name of the file (used to build dest path)
 
     Returns:
         True if successful, False otherwise
     """
     try:
-        # Ensure destination directory exists
-        dest_dir = os.path.dirname(dest_path)
         ensure_directory_exists(dest_dir)
+        dest_path = os.path.join(dest_dir, filename)
 
-        # Handle duplicate files
+        # Handle duplicate files by generating a unique name
         if os.path.exists(dest_path):
             dest_path = _get_unique_filename(dest_path)
             logger.info(
-                "File already exists, renamed to: %s", os.path.basename(dest_path)
+                "File already exists, renamed to: %s",
+                os.path.basename(dest_path),
             )
 
-        # Perform the move
         shutil.move(source_path, dest_path)
-        logger.info("Moved file: %s -> %s", filename, dest_path)
+        logger.debug("Moved file: %s -> %s", filename, dest_path)
         return True
 
     except (OSError, IOError, shutil.Error) as e:
-        logger.error("Error moving file %s: %s", filename, e)
+        logger.error("Failed to move file %s: %s", source_path, e)
         return False
 
 
@@ -136,17 +144,20 @@ def cleanup_empty_directories(directory_path: str) -> int:
     return removed_count
 
 
-def should_skip_file(filename: str, skip_patterns: set) -> bool:
+def should_skip_file(filename: str, skip_patterns: set = None) -> bool:
     """
-    Check if file should be skipped based on patterns.
+    Check if file should be skipped (deleted or ignored).
 
     Args:
         filename: File name to check
-        skip_patterns: Set of patterns to skip
+        skip_patterns: Set of lowercase filenames to skip.
+                       Defaults to FILES_TO_DELETE.
 
     Returns:
         True if file should be skipped
     """
+    if skip_patterns is None:
+        skip_patterns = FILES_TO_DELETE
     return filename.lower() in skip_patterns
 
 
