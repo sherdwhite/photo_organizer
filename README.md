@@ -5,8 +5,8 @@ A powerful Python application that automatically organizes your photos and video
 ## Features
 
 - 📁 **Automatic Organization**: Sorts photos and videos into Year/Month folder structure
-- 🖼️ **Multi-Format Support**: Handles JPEG, PNG, GIF, MOV, MP4, AVI, M4V, 3GP files
-- 📅 **Smart Date Detection**: Uses EXIF data, file metadata, and creation dates
+- 🖼️ **Multi-Format Support**: Handles JPEG, PNG, GIF, WebP, TIFF, BMP, HEIC/HEIF, RAW (CR2, CR3, NEF, ARW, DNG, ORF, RW2, RAF), MOV, MP4, AVI, M4V, MKV, WebM, 3GP, and more
+- 📅 **Smart Date Detection**: 6-level fallback chain — EXIF, Pillow, XMP metadata, filename patterns, and filesystem timestamps
 - 🖥️ **Dual Interface**: Command-line tool and modern GUI interface
 - 🔍 **Real-time Logging**: See what's happening during organization
 - ✅ **Safe Operations**: Handles duplicates and file conflicts gracefully
@@ -27,26 +27,28 @@ python -m venv venv
 
 # Activate virtual environment
 # On Windows (Git Bash):
-source venv/Scripts/activate
+source .venv/Scripts/activate
 # On Windows (Command Prompt):
 venv\Scripts\activate
 # On macOS/Linux:
-source venv/bin/activate
+source .venv/bin/activate
 ```
 
-3. Install system dependencies (Fedora/RHEL):
+3. Install FFmpeg (optional, **recommended** for fast video processing):
 ```bash
-# Required for building gevent's C extensions
-sudo dnf install gcc python3-devel
+# Fedora/RHEL:
+sudo dnf install ffmpeg
+# Debian/Ubuntu:
+sudo apt install ffmpeg
+# macOS:
+brew install ffmpeg
+# Windows:
+winget install FFmpeg
 ```
 
-> **Note for Fedora/RHEL users**: The `gevent` package requires compiling C extensions. You must install `gcc` and `python3-devel` before running pip install.
->
-> **For other Linux distributions**:
-> - Debian/Ubuntu: `sudo apt install build-essential python3-dev`
-> - Arch: `sudo pacman -S base-devel`
+> Without FFmpeg the app still works — it falls back to the hachoir library, which is slower on large video files.
 
-4. Install Python dependencies:
+5. Install Python dependencies:
 ```bash
 pip install -r requirements.txt
 ```
@@ -110,9 +112,11 @@ destination_folder/
 | Type | Extensions | Metadata Source |
 |------|------------|----------------|
 | Photos | `.jpg`, `.jpeg` | EXIF data |
-| PNG Images | `.png` | File metadata |
-| GIF Images | `.gif` | File metadata |
-| Videos | `.mov`, `.mp4`, `.avi`, `.m4v`, `.3gp` | Container metadata |
+| HEIC/HEIF | `.heic`, `.heif` | EXIF via pillow-heif |
+| Images | `.png`, `.gif`, `.webp`, `.tiff`, `.tif`, `.bmp`, `.mpo`, `.avif` | Pillow metadata / EXIF |
+| JPEG 2000 | `.jp2`, `.j2k` | EXIF via Pillow |
+| RAW | `.dng`, `.cr2`, `.cr3`, `.nef`, `.arw`, `.orf`, `.rw2`, `.raf` | EXIF via exifread |
+| Videos | `.mov`, `.mp4`, `.avi`, `.m4v`, `.3gp`, `.mkv`, `.webm` | ffprobe (hachoir fallback) |
 
 ## Development
 
@@ -151,32 +155,37 @@ photo_organizer/
 │   ├── __init__.py
 │   ├── main.py               # Entry point with CLI/GUI selection
 │   ├── organize_photos.py    # Core organization logic
-│   ├── exif.py              # EXIF data extraction
+│   ├── exif.py              # EXIF data extraction (exif lib + Pillow fallback)
+│   ├── date_utils.py        # Date validation, XMP parsing, filesystem dates
 │   ├── utils.py             # Command line argument parsing
 │   ├── error_handling.py    # Error handling utilities
 │   ├── log.py               # Logging configuration
 │   ├── file_operations.py   # File system operations
 │   ├── file_types/          # Consolidated file extractors
 │   │   ├── __init__.py      # Unified registry interface
-│   │   ├── video_extractors.py  # Video formats (MOV, MP4, AVI, M4V, 3GP)
-│   │   └── image_extractors.py  # Image formats (PNG, GIF)
+│   │   ├── video_extractors.py  # Video formats (ffprobe + hachoir fallback)
+│   │   ├── image_extractors.py  # Image formats (PNG, GIF, WebP, TIFF, etc.)
+│   │   ├── raw_extractors.py    # Camera RAW formats (CR2, NEF, ARW, DNG, etc.)
+│   │   └── heif_extractor.py    # HEIC/HEIF support (iPhone photos)
 │   └── tests/               # Test suite
 ├── gui/                     # GUI application
 │   └── photo_organizer_gui.py
 ├── run.py                   # Main launcher
 ├── launch_gui.py           # GUI-only launcher
 ├── dev.py                  # Development helper script
-└── requirements.txt        # Dependencies
+└── requirements.txt        # Python dependencies
 ```
 
 ## Requirements
 
 - Python 3.7+
-- PyQt6 (for GUI)
+- PyQt5 (for GUI)
 - Pillow (image processing)
-- hachoir (video metadata)
+- pillow-heif (HEIC/HEIF support)
 - exif (EXIF data)
-- gevent (async operations)
+- exifread (RAW format metadata)
+- hachoir (video metadata fallback)
+- **Optional**: FFmpeg (`ffprobe`) for fast video metadata extraction
 
 ## License
 
@@ -194,7 +203,7 @@ GNU General Public License v3.0 - see LICENSE file for details.
 ## Troubleshooting
 
 ### GUI Won't Start
-- Ensure PyQt6 is installed: `pip install PyQt6`
+- Ensure PyQt5 is installed: `pip install PyQt5`
 - Check Python version (3.7+ required)
 
 ### Files Not Being Organized
@@ -203,6 +212,7 @@ GNU General Public License v3.0 - see LICENSE file for details.
 - Check logs for specific error messages
 
 ### Performance Issues
+- Install FFmpeg for fast video processing (`ffprobe`)
 - For large directories, use command-line interface
 - Ensure adequate disk space in destination
 - Close other applications that might lock files

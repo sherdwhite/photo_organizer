@@ -6,9 +6,15 @@ from datetime import datetime
 from struct import error as UnpackError
 from typing import Optional
 
+from photo_organizer.date_utils import (
+    extract_xmp_date,
+    get_filesystem_date,
+    validate_date,
+)
 from photo_organizer.error_handling import log_and_handle_error
-from photo_organizer.exif import extract_exif_data
+from photo_organizer.exif import extract_exif_data, extract_exif_via_pillow
 from photo_organizer.file_types import ALL_EXTRACTORS
+from photo_organizer.file_types.video_extractors import VIDEO_EXTRACTORS
 from photo_organizer.log import setup_logging
 from photo_organizer.utils import get_default_pictures_directory
 
@@ -17,99 +23,247 @@ logger = logging.getLogger(__name__)
 # Use the consolidated extractors registry
 FILE_TYPE_EXTRACTORS = ALL_EXTRACTORS
 
+# Extensions where EXIF / Pillow fallbacks are pointless (video files)
+_VIDEO_EXTENSIONS = frozenset(VIDEO_EXTRACTORS.keys())
+
 # Files to be deleted automatically
 FILES_TO_DELETE = {"thumbs.db", "desktop"}
 
 
 def extract_date_from_filename(filename: str) -> Optional[str]:
     """
-    Extract date from filename patterns like IMG_20250808_090022.jpg.
+    Extract date from filename patterns.
 
-    Supports patterns:
-    - IMG_YYYYMMDD_HHMMSS.ext
-    - YYYYMMDD_HHMMSS.ext
-    - IMG-YYYYMMDD-HHMMSS.ext
-    - YYYY-MM-DD_HH-MM-SS.ext
-    - And variations with different separators
+    Supports patterns from many camera/phone/app naming conventions:
+    - IMG_YYYYMMDD_HHMMSS (generic Android)
+    - YYYYMMDD_HHMMSS (Samsung, bare date)
+    - IMG-YYYYMMDD-HHMMSS (WhatsApp)
+    - PXL_YYYYMMDD_HHMMSS (Google Pixel)
+    - Screenshot_YYYYMMDD-HHMMSS (Android screenshots)
+    - Screenshot YYYY-MM-DD at HH.MM.SS (macOS screenshots)
+    - signal-YYYY-MM-DD-HHMMSS (Signal app)
+    - YYYY-MM-DD_HH-MM-SS (ISO-ish)
+    - YYYYMMDD (date-only fallback)
 
     Args:
         filename: Name of the file (not the full path)
 
     Returns:
-        Creation date string in format "YYYY:MM:DD HH:MM:SS" or None
+        Validated creation date string or None
     """
-    # Remove file extension
     name_without_ext = os.path.splitext(filename)[0]
 
-    # Pattern 1: IMG_20250808_090022 or similar (YYYYMMDD_HHMMSS)
+    # Pattern 1: Full datetime — YYYYMMDD_HHMMSS or YYYYMMDD-HHMMSS
+    # Covers: IMG_20250808_090022, PXL_20250115_103045123,
+    #         Screenshot_20250115-103045, 20250115_103045
     pattern1 = r"(\d{4})(\d{2})(\d{2})[_-](\d{2})(\d{2})(\d{2})"
     match = re.search(pattern1, name_without_ext)
     if match:
         year, month, day, hour, minute, second = match.groups()
-        try:
-            # Validate the date
-            dt = datetime(
-                int(year), int(month), int(day), int(hour), int(minute), int(second)
-            )
+        dt = _try_build_datetime(year, month, day, hour, minute, second)
+        if dt:
             result = dt.strftime("%Y:%m:%d %H:%M:%S")
-            logger.debug("Extracted date from filename %s: %s", filename, result)
-            return result
-        except ValueError:
-            pass
+            logger.debug(
+                "Extracted date from filename %s: %s",
+                filename,
+                result,
+            )
+            return validate_date(result)
 
-    # Pattern 2: YYYY-MM-DD or YYYYMMDD (date only, no time)
-    pattern2 = r"(\d{4})[_-]?(\d{2})[_-]?(\d{2})"
+    # Pattern 2: ISO-like — YYYY-MM-DD HH.MM.SS or YYYY-MM-DD-HH-MM-SS
+    # Covers: Screenshot 2025-01-15 at 10.30.45,
+    #         signal-2025-01-15-103045
+    pattern2 = (
+        r"(\d{4})-(\d{2})-(\d{2})" r"[\s_at-]*" r"(\d{2})[.\-:](\d{2})[.\-:](\d{2})"
+    )
     match = re.search(pattern2, name_without_ext)
     if match:
-        year, month, day = match.groups()
-        try:
-            # Validate the date and set time to noon
-            dt = datetime(int(year), int(month), int(day), 12, 0, 0)
+        year, month, day, hour, minute, second = match.groups()
+        dt = _try_build_datetime(year, month, day, hour, minute, second)
+        if dt:
             result = dt.strftime("%Y:%m:%d %H:%M:%S")
-            logger.debug("Extracted date from filename %s: %s", filename, result)
-            return result
-        except ValueError:
-            pass
+            logger.debug(
+                "Extracted date from filename %s: %s",
+                filename,
+                result,
+            )
+            return validate_date(result)
+
+    # Pattern 3: Date only — YYYY-MM-DD or YYYYMMDD
+    # (set time to noon as a reasonable default)
+    pattern3 = r"(\d{4})[_-]?(\d{2})[_-]?(\d{2})"
+    match = re.search(pattern3, name_without_ext)
+    if match:
+        year, month, day = match.groups()
+        dt = _try_build_datetime(year, month, day, "12", "0", "0")
+        if dt:
+            result = dt.strftime("%Y:%m:%d %H:%M:%S")
+            logger.debug(
+                "Extracted date from filename %s: %s",
+                filename,
+                result,
+            )
+            return validate_date(result)
 
     return None
 
 
+def _try_build_datetime(
+    year: str,
+    month: str,
+    day: str,
+    hour: str,
+    minute: str,
+    second: str,
+) -> Optional[datetime]:
+    """
+    Try to construct a datetime, returning None on failure.
+
+    Args:
+        year, month, day, hour, minute, second: String components
+
+    Returns:
+        datetime object or None if values are invalid
+    """
+    try:
+        return datetime(
+            int(year),
+            int(month),
+            int(day),
+            int(hour),
+            int(minute),
+            int(second),
+        )
+    except ValueError:
+        return None
+
+
 def get_file_creation_date(file_path: str) -> Optional[str]:
     """
-    Extract creation date from file based on its extension.
+    Extract creation date from file using a multi-level fallback chain.
+
+    The chain tries these sources in order, stopping at the first
+    valid result:
+      1. Registered file-type extractor (format-specific metadata)
+      2. Generic EXIF via the exif library
+      3. Pillow EXIF fallback (different parser, catches edge cases)
+      4. XMP metadata scan (XML embedded in file)
+      5. Filename pattern parsing
+      6. File system timestamps (st_birthtime / st_mtime)
+
+    When both metadata and filename yield dates, prefers metadata
+    but logs a warning if they disagree by more than a day.
 
     Args:
         file_path: Full path to the file
 
     Returns:
-        Creation date string in format "YYYY:MM:DD HH:MM:SS" or None
+        Validated creation date string or None
     """
     file_ext = os.path.splitext(file_path)[1].lower()
     filename = os.path.basename(file_path)
+    metadata_date = None
 
-    # Try specific file type extractors first using the registry
+    # --- Step 1: Registered file-type extractor ---
     if file_ext in FILE_TYPE_EXTRACTORS:
         extractor_func = FILE_TYPE_EXTRACTORS[file_ext]
         date = extractor_func(file_path)
         if date:
-            return date
-    else:
-        # Fall back to EXIF data for other image types
+            metadata_date = date
+
+    # Steps 2–3 only apply to image files; video files have no
+    # EXIF/Pillow-readable data, so we skip them to avoid slow I/O.
+    is_video = file_ext in _VIDEO_EXTENSIONS
+
+    # --- Step 2: Generic EXIF via exif library ---
+    if not metadata_date and not is_video:
         try:
             with open(file_path, "rb") as image_file:
                 date = extract_exif_data(image_file)
                 if date:
-                    return date
+                    metadata_date = date
         except (OSError, IOError, ValueError) as e:
-            logger.warning("Could not read file %s: %s", file_path, e)
+            logger.debug("Could not read EXIF from %s: %s", file_path, e)
 
-    # If no date found from metadata, try parsing the filename
-    date = extract_date_from_filename(filename)
-    if date:
-        logger.info("Using date from filename for %s: %s", filename, date)
-        return date
+    # --- Step 3: Pillow EXIF fallback ---
+    if not metadata_date and not is_video:
+        date = extract_exif_via_pillow(file_path)
+        if date:
+            metadata_date = date
+
+    # --- Step 4: XMP metadata ---
+    if not metadata_date:
+        date = extract_xmp_date(file_path)
+        if date:
+            metadata_date = date
+
+    # --- Step 5: Filename pattern parsing ---
+    filename_date = extract_date_from_filename(filename)
+
+    # Cross-reference: if both metadata and filename have dates,
+    # prefer metadata but warn if they disagree significantly
+    if metadata_date and filename_date:
+        _cross_reference_dates(filename, metadata_date, filename_date)
+        return metadata_date
+
+    if metadata_date:
+        return metadata_date
+
+    if filename_date:
+        logger.info(
+            "Using date from filename for %s: %s",
+            filename,
+            filename_date,
+        )
+        return filename_date
+
+    # --- Step 6: Filesystem timestamps (last resort) ---
+    fs_date = get_filesystem_date(file_path)
+    if fs_date:
+        logger.info(
+            "Using filesystem date for %s: %s",
+            filename,
+            fs_date,
+        )
+        return fs_date
 
     return None
+
+
+def _cross_reference_dates(
+    filename: str,
+    metadata_date: str,
+    filename_date: str,
+) -> None:
+    """
+    Log a warning if metadata and filename dates disagree.
+
+    A disagreement of more than 1 day often means the file was
+    renamed by a messaging app or cloud service, or the metadata
+    was reset. The log helps users audit questionable files.
+
+    Args:
+        filename: Name of the file
+        metadata_date: Date from metadata
+        filename_date: Date parsed from filename
+    """
+    try:
+        fmt = "%Y:%m:%d %H:%M:%S"
+        dt_meta = datetime.strptime(metadata_date, fmt)
+        dt_file = datetime.strptime(filename_date, fmt)
+        delta = abs((dt_meta - dt_file).total_seconds())
+        if delta > 86400:  # more than 1 day apart
+            logger.warning(
+                "Date mismatch for %s: metadata=%s, "
+                "filename=%s (%.0f hours apart). "
+                "Using metadata date.",
+                filename,
+                metadata_date,
+                filename_date,
+                delta / 3600,
+            )
+    except (ValueError, TypeError):
+        pass  # Can't compare — not worth logging
 
 
 def should_skip_file(filename: str) -> bool:
@@ -248,10 +402,12 @@ def organize(
             logger.info(
                 "Processing file %d/%d: %s", processed_count, total_files, filename
             )
-            if progress_callback:
-                progress_callback(
-                    f"Processing file {processed_count}/{total_files}: {filename}"
-                )
+
+        # Always update the GUI progress (lightweight status bar update)
+        if progress_callback:
+            progress_callback(
+                f"Processing file {processed_count}/{total_files}: {filename}"
+            )
 
         try:
             creation_date = get_file_creation_date(file_path)
@@ -304,5 +460,6 @@ def organize(
     )
     if progress_callback:
         progress_callback(
-            f"Complete: {processed_count} files processed, {moved_count} moved, {error_count} errors"
+            f"Complete: {processed_count} processed, "
+            f"{moved_count} moved, {error_count} errors"
         )

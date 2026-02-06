@@ -43,24 +43,17 @@ def setup_dirs():
                 raise
 
 
-@patch("photo_organizer.organize_photos.parse_args")
 @patch("photo_organizer.organize_photos.get_file_creation_date")
-def test_move_files_to_correct_destination(
-    mock_get_creation_date, mock_parse_args, setup_dirs
-):
-    """Test that files are moved to correct year/month destination folders."""
+def test_move_files_to_correct_destination(mock_get_creation_date, setup_dirs):
+    """Test that files are moved to correct year/month folders."""
     origin_dir, destination_dir = setup_dirs
-    mock_parse_args.return_value = {
-        "origin_dir": origin_dir,
-        "destination_dir": destination_dir,
-    }
     mock_get_creation_date.return_value = "2023:01:01 12:00:00"
 
     test_file = os.path.join(origin_dir, "test.mov")
     with open(test_file, "w") as f:
         f.write("dummy data")
 
-    organize()
+    organize(origin_dir, destination_dir)
 
     expected_dir = os.path.join(destination_dir, "2023", "01")
     expected_file = os.path.join(expected_dir, "test.mov")
@@ -70,31 +63,21 @@ def test_move_files_to_correct_destination(
     assert not os.path.exists(test_file)
 
 
-@patch("photo_organizer.organize_photos.parse_args")
-def test_remove_empty_directories(mock_parse_args, setup_dirs):
+def test_remove_empty_directories(setup_dirs):
     """Test that empty directories are removed after organization."""
     origin_dir, destination_dir = setup_dirs
-    mock_parse_args.return_value = {
-        "origin_dir": origin_dir,
-        "destination_dir": destination_dir,
-    }
 
     empty_dir = os.path.join(origin_dir, "empty_dir")
     os.makedirs(empty_dir)
 
-    organize()
+    organize(origin_dir, destination_dir)
 
     assert not os.path.exists(empty_dir)
 
 
-@patch("photo_organizer.organize_photos.parse_args")
-def test_delete_specific_files(mock_parse_args, setup_dirs):
-    """Test that specific unwanted files are deleted during organization."""
+def test_delete_specific_files(setup_dirs):
+    """Test that specific unwanted files are deleted."""
     origin_dir, destination_dir = setup_dirs
-    mock_parse_args.return_value = {
-        "origin_dir": origin_dir,
-        "destination_dir": destination_dir,
-    }
 
     thumbs_file = os.path.join(origin_dir, "Thumbs.db")
     desktop_file = os.path.join(origin_dir, "desktop")
@@ -103,76 +86,66 @@ def test_delete_specific_files(mock_parse_args, setup_dirs):
     with open(desktop_file, "w") as f:
         f.write("dummy data")
 
-    organize()
+    organize(origin_dir, destination_dir)
 
     assert not os.path.exists(thumbs_file)
     assert not os.path.exists(desktop_file)
 
 
-@patch("photo_organizer.organize_photos.parse_args")
-@patch("photo_organizer.organize_photos.extract_exif_data")
+@patch("photo_organizer.organize_photos.get_file_creation_date")
 @patch("photo_organizer.organize_photos.log_and_handle_error")
 def test_handle_files_without_exif_data(
-    mock_log_and_handle_error, mock_extract_exif_data, mock_parse_args, setup_dirs
+    mock_log_and_handle_error,
+    mock_get_creation_date,
+    setup_dirs,
 ):
     """Test proper error handling for files without EXIF data."""
     origin_dir, destination_dir = setup_dirs
-    mock_parse_args.return_value = {
-        "origin_dir": origin_dir,
-        "destination_dir": destination_dir,
-    }
-    mock_extract_exif_data.return_value = None
+    mock_get_creation_date.return_value = None
 
     test_file = os.path.join(origin_dir, "test.jpg")
     with open(test_file, "w") as f:
         f.write("dummy data")
 
-    organize()
+    organize(origin_dir, destination_dir)
 
     mock_log_and_handle_error.assert_called_once()
 
 
-@patch("photo_organizer.organize_photos.parse_args")
-@patch("photo_organizer.organize_photos.extract_exif_data")
+@patch("photo_organizer.organize_photos.get_file_creation_date")
 @patch("photo_organizer.organize_photos.log_and_handle_error")
 def test_handle_files_with_bad_exif_data(
-    mock_log_and_handle_error, mock_extract_exif_data, mock_parse_args, setup_dirs
+    mock_log_and_handle_error,
+    mock_get_creation_date,
+    setup_dirs,
 ):
-    """Test proper error handling for files with corrupted EXIF data."""
+    """Test proper error handling for files with corrupted EXIF."""
     origin_dir, destination_dir = setup_dirs
-    mock_parse_args.return_value = {
-        "origin_dir": origin_dir,
-        "destination_dir": destination_dir,
-    }
-    mock_extract_exif_data.side_effect = ValueError("Bad EXIF data")
+    mock_get_creation_date.side_effect = ValueError("Bad EXIF data")
 
     test_file = os.path.join(origin_dir, "test.jpg")
     with open(test_file, "w") as f:
         f.write("dummy data")
 
-    organize()
+    organize(origin_dir, destination_dir)
 
     mock_log_and_handle_error.assert_called_once()
 
 
-@patch("photo_organizer.organize_photos.parse_args")
-@patch("photo_organizer.organize_photos.os.remove")
+@patch(
+    "photo_organizer.organize_photos.os.remove",
+    side_effect=PermissionError("Permission denied"),
+)
 @patch("photo_organizer.organize_photos.logger.error")
-def test_handle_permission_error(
-    mock_logger_error, mock_os_remove, mock_parse_args, setup_dirs
-):
+def test_handle_permission_error(mock_logger_error, mock_os_remove, setup_dirs):
     """Test proper error handling for file permission errors."""
     origin_dir, destination_dir = setup_dirs
-    mock_parse_args.return_value = {
-        "origin_dir": origin_dir,
-        "destination_dir": destination_dir,
-    }
-    mock_os_remove.side_effect = PermissionError("Permission denied")
 
-    test_file = os.path.join(origin_dir, "test.jpg")
+    # Create a file that will match FILES_TO_DELETE to trigger os.remove
+    test_file = os.path.join(origin_dir, "Thumbs.db")
     with open(test_file, "w") as f:
         f.write("dummy data")
 
-    organize()
+    organize(origin_dir, destination_dir)
 
     mock_logger_error.assert_called()

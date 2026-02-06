@@ -1,6 +1,7 @@
 exif==1.6.1
-gevent==25.5.1
+exifread>=3.0.0
 hachoir==3.3.0
-PyQt5==5.15.11
 pillow==11.3.0
+pillow-heif>=0.18.0
+PyQt5==5.15.11
 pytest==8.4.1

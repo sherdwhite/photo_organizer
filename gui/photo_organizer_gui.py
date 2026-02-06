@@ -1,9 +1,10 @@
+import faulthandler
 import logging
 import os
 import sys
 import traceback
 
-from PyQt5.QtCore import Qt, QThread, pyqtSignal
+from PyQt5.QtCore import QMetaType, QObject, Qt, QThread, pyqtSignal
 from PyQt5.QtGui import QFont
 from PyQt5.QtWidgets import (
     QApplication,
@@ -24,6 +25,15 @@ from PyQt5.QtWidgets import (
 
 from photo_organizer.organize_photos import organize
 
+# Register QTextCursor so queued signal-slot connections that
+# involve it internally (e.g. QTextEdit) don't produce the
+# "Cannot queue arguments of type 'QTextCursor'" warning.
+QMetaType.type("QTextCursor")
+
+# Enable faulthandler so native crashes (segfault, etc.) print a
+# Python traceback to stderr before the process dies.
+faulthandler.enable()
+
 logger = logging.getLogger(__name__)
 
 
@@ -41,10 +51,29 @@ def exception_hook(exc_type, exc_value, exc_traceback):
         crash_log = os.path.join(os.getcwd(), "gui_crash.log")
         with open(crash_log, "a") as f:
             f.write(f"\n{'='*80}\n")
-            f.write(f"Unhandled Exception at {os.popen('date').read().strip()}\n")
+            f.write(f"Unhandled Exception at " f"{os.popen('date').read().strip()}\n")
             f.write(f"{'='*80}\n")
             f.write(error_msg)
-        print(f"Exception logged to: {crash_log}", file=sys.stderr)
+        print(
+            f"Exception logged to: {crash_log}",
+            file=sys.stderr,
+        )
+    except Exception:
+        pass
+
+    # Show a modal error dialog so the user sees what happened
+    try:
+        app = QApplication.instance()
+        if app is not None:
+            dlg = QMessageBox()
+            dlg.setIcon(QMessageBox.Critical)
+            dlg.setWindowTitle("Photo Organizer — Crash")
+            dlg.setText(
+                "An unexpected error occurred and the application " "needs to close."
+            )
+            dlg.setDetailedText(error_msg)
+            dlg.setStandardButtons(QMessageBox.Ok)
+            dlg.exec_()
     except Exception:
         pass
 
@@ -53,35 +82,62 @@ def exception_hook(exc_type, exc_value, exc_traceback):
 sys.excepthook = exception_hook
 
 
-class LogHandler(logging.Handler):
-    """Custom logging handler to redirect log messages to GUI."""
+class LogSignalBridge(QObject):
+    """Bridge that safely relays log messages to the GUI thread.
 
-    def __init__(self, text_widget):
-        super().__init__()
+    Qt widgets must only be modified from the main thread.  This
+    object lives on the main thread and receives log text via a
+    queued signal connection, so the actual QTextEdit.append()
+    always runs on the GUI thread — eliminating the segfault that
+    occurred when LogHandler wrote from the worker thread directly.
+    """
+
+    log_message = pyqtSignal(str)
+
+    def __init__(self, text_widget, parent=None):
+        super().__init__(parent)
         self.text_widget = text_widget
         self.message_count = 0
-        self.max_messages = 1000  # Limit messages to prevent memory issues
+        self.max_messages = 1000
 
-    def emit(self, record):
-        """Emit log record to the text widget."""
+        # Queued connection ensures the slot runs on the main thread
+        self.log_message.connect(self._append_message, Qt.QueuedConnection)
+
+    def _append_message(self, msg: str):
+        """Append a formatted log message (runs on GUI thread)."""
         try:
-            # Limit the number of messages to prevent memory issues
             if self.message_count >= self.max_messages:
-                # Clear half the messages when limit is reached
                 self.text_widget.clear()
                 self.text_widget.append(
                     "... (Log cleared to prevent memory issues) ..."
                 )
                 self.message_count = 1
 
-            msg = self.format(record)
-
-            # Only add INFO level and above messages to reduce noise
-            if record.levelno >= logging.INFO:
-                self.text_widget.append(msg)
-                self.message_count += 1
+            self.text_widget.append(msg)
+            self.message_count += 1
         except Exception:
-            # Silently ignore errors to prevent crashes
+            pass
+
+
+class LogHandler(logging.Handler):
+    """Custom logging handler that relays messages via a signal.
+
+    This handler is thread-safe: it formats the record and emits
+    a Qt signal.  The connected LogSignalBridge slot performs the
+    actual widget update on the main thread.
+    """
+
+    def __init__(self, bridge: LogSignalBridge):
+        super().__init__()
+        self.bridge = bridge
+
+    def emit(self, record):
+        """Emit log record via signal (safe from any thread)."""
+        try:
+            msg = self.format(record)
+            if record.levelno >= logging.INFO:
+                self.bridge.log_message.emit(msg)
+        except Exception:
             pass
 
 
@@ -116,9 +172,10 @@ class OrganizerWorker(QThread):
             self.finished.emit()
 
         except Exception as e:
-            error_msg = f"Error during photo organization: {str(e)}"
+            tb = traceback.format_exc()
+            error_msg = f"Error during photo organization: {e}"
             self.progress.emit(error_msg)
-            self.error.emit(str(e))
+            self.error.emit(f"{e}\n\n--- Traceback ---\n{tb}")
         finally:
             # Restore normal logging level
             logging.getLogger("photo_organizer").setLevel(logging.INFO)
@@ -240,11 +297,19 @@ class PhotoOrganizerGUI(QMainWindow):
         # Status bar
         self.statusBar().showMessage("Ready to organize photos")
 
+        # Permanent progress label on the right side of the status bar
+        self.progress_label = QLabel("")
+        self.progress_label.setFont(QFont("Consolas", 9))
+        self.statusBar().addPermanentWidget(self.progress_label)
+
     def setup_logging(self):
         """Set up logging to redirect to the GUI text widget."""
-        # Create custom handler for GUI
-        self.log_handler = LogHandler(self.log_text)
-        self.log_handler.setLevel(logging.WARNING)  # Only show warnings and errors
+        # Create signal bridge (lives on main thread, owns the widget update)
+        self.log_bridge = LogSignalBridge(self.log_text, parent=self)
+
+        # Create custom handler that emits via the bridge signal
+        self.log_handler = LogHandler(self.log_bridge)
+        self.log_handler.setLevel(logging.WARNING)
 
         # Format the log messages
         formatter = logging.Formatter(
@@ -352,6 +417,7 @@ class PhotoOrganizerGUI(QMainWindow):
         """Handle completion of photo organization."""
         self.organize_btn.setEnabled(True)
         self.progress_bar.setVisible(False)
+        self.progress_label.setText("")
         self.statusBar().showMessage("Photo organization completed successfully!")
 
         QMessageBox.information(
@@ -359,16 +425,45 @@ class PhotoOrganizerGUI(QMainWindow):
         )
 
     def on_organization_error(self, error_msg: str):
-        """Handle errors during photo organization."""
+        """Handle errors during photo organization.
+
+        Shows a modal dialog with an OK button.  The full traceback
+        is available via the 'Show Details...' button.
+        """
         self.organize_btn.setEnabled(True)
         self.progress_bar.setVisible(False)
+        self.progress_label.setText("")
         self.statusBar().showMessage("Error occurred during organization")
 
-        QMessageBox.critical(self, "Error", f"An error occurred: {error_msg}")
+        # Split short summary from full traceback (if present)
+        if "\n\n--- Traceback ---\n" in error_msg:
+            summary, details = error_msg.split("\n\n--- Traceback ---\n", 1)
+        else:
+            summary = error_msg
+            details = ""
+
+        dlg = QMessageBox(self)
+        dlg.setIcon(QMessageBox.Critical)
+        dlg.setWindowTitle("Photo Organizer — Error")
+        dlg.setText("An error occurred during photo organization.")
+        dlg.setInformativeText(summary)
+        if details:
+            dlg.setDetailedText(details)
+        dlg.setStandardButtons(QMessageBox.Ok)
+        dlg.exec_()
 
     def on_progress_update(self, message: str):
-        """Handle progress updates."""
-        self.log_text.append(message)
+        """Handle progress updates.
+
+        Per-file 'Processing file ...' messages only update the
+        status bar label (bottom-right). Other messages (Found,
+        Complete, etc.) are also appended to the log text area.
+        """
+        self.progress_label.setText(message)
+
+        # Only append non-per-file messages to the log to avoid spam
+        if not message.startswith("Processing file "):
+            self.log_text.append(message)
 
     def clear_log(self):
         """Clear the log text area."""
