@@ -1,6 +1,6 @@
 # Photo Organizer
 
-A powerful Python application that automatically organizes your photos and videos by their creation date, extracting metadata from EXIF data and file headers. Available in both command-line and GUI versions.
+Python application that automatically organizes your photos and videos by their creation date, extracting metadata from EXIF data and file headers. Available in both command-line and GUI versions.
 
 ## Features
 
@@ -10,7 +10,6 @@ A powerful Python application that automatically organizes your photos and video
 - 🖥️ **Dual Interface**: Command-line tool and modern GUI interface
 - 🔍 **Real-time Logging**: See what's happening during organization
 - ✅ **Safe Operations**: Handles duplicates and file conflicts gracefully
-- 🛡️ **Error Handling**: Robust error handling with detailed logging
 
 ## Installation
 
