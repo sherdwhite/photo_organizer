@@ -179,7 +179,7 @@ photo_organizer/
 ## Requirements
 
 - Python 3.7+
-- PyQt5 (for GUI)
+- PySide6 (for GUI)
 - Pillow (image processing)
 - pillow-heif (HEIC/HEIF support)
 - exif (EXIF data)
@@ -203,7 +203,7 @@ GNU General Public License v3.0 - see LICENSE file for details.
 ## Troubleshooting
 
 ### GUI Won't Start
-- Ensure PyQt5 is installed: `pip install PyQt5`
+- Ensure PySide6 is installed: `pip install PySide6`
 - Check Python version (3.7+ required)
 
 ### Files Not Being Organized

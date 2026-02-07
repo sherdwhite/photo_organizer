@@ -4,9 +4,9 @@ import os
 import sys
 import traceback
 
-from PyQt5.QtCore import QMetaType, QObject, Qt, QThread, pyqtSignal
-from PyQt5.QtGui import QFont
-from PyQt5.QtWidgets import (
+from PySide6.QtCore import QObject, Qt, QThread, Signal
+from PySide6.QtGui import QFont
+from PySide6.QtWidgets import (
     QApplication,
     QFileDialog,
     QGridLayout,
@@ -26,11 +26,6 @@ from PyQt5.QtWidgets import (
 from photo_organizer.organize_photos import organize
 
 # ── Module-level setup ───────────────────────────────────────────────
-
-# Register QTextCursor so queued signal-slot connections that
-# involve it internally (e.g. QTextEdit) don't produce the
-# "Cannot queue arguments of type 'QTextCursor'" warning.
-QMetaType.type("QTextCursor")
 
 # Enable faulthandler so native crashes (segfault, etc.) print a
 # Python traceback to stderr before the process dies.
@@ -71,14 +66,14 @@ def exception_hook(exc_type, exc_value, exc_traceback):
         app = QApplication.instance()
         if app is not None:
             dlg = QMessageBox()
-            dlg.setIcon(QMessageBox.Critical)
+            dlg.setIcon(QMessageBox.Icon.Critical)
             dlg.setWindowTitle("Photo Organizer — Crash")
             dlg.setText(
                 "An unexpected error occurred and the application " "needs to close."
             )
             dlg.setDetailedText(error_msg)
-            dlg.setStandardButtons(QMessageBox.Ok)
-            dlg.exec_()
+            dlg.setStandardButtons(QMessageBox.StandardButton.Ok)
+            dlg.exec()
     except Exception:
         pass
 
@@ -100,7 +95,7 @@ class LogSignalBridge(QObject):
     occurred when LogHandler wrote from the worker thread directly.
     """
 
-    log_message = pyqtSignal(str)
+    log_message = Signal(str)
 
     def __init__(self, text_widget, parent=None):
         super().__init__(parent)
@@ -155,9 +150,9 @@ class LogHandler(logging.Handler):
 class OrganizerWorker(QThread):
     """Worker thread for organizing photos to avoid blocking the GUI."""
 
-    finished = pyqtSignal()
-    error = pyqtSignal(str)
-    progress = pyqtSignal(str)
+    finished = Signal()
+    error = Signal(str)
+    progress = Signal(str)
 
     def __init__(self, origin_dir: str, destination_dir: str):
         super().__init__()
@@ -346,7 +341,10 @@ class PhotoOrganizerGUI(QMainWindow):
     def browse_origin_directory(self):
         """Open dialog to select origin directory."""
         directory = QFileDialog.getExistingDirectory(
-            self, "Select Source Directory", "", QFileDialog.Option.ShowDirsOnly
+            self,
+            "Select Source Directory",
+            "",
+            QFileDialog.Option.ShowDirsOnly,
         )
         if directory:
             self.origin_path.setText(directory)
@@ -354,7 +352,10 @@ class PhotoOrganizerGUI(QMainWindow):
     def browse_destination_directory(self):
         """Open dialog to select destination directory."""
         directory = QFileDialog.getExistingDirectory(
-            self, "Select Destination Directory", "", QFileDialog.Option.ShowDirsOnly
+            self,
+            "Select Destination Directory",
+            "",
+            QFileDialog.Option.ShowDirsOnly,
         )
         if directory:
             self.dest_path.setText(directory)
@@ -468,14 +469,14 @@ class PhotoOrganizerGUI(QMainWindow):
             details = ""
 
         dlg = QMessageBox(self)
-        dlg.setIcon(QMessageBox.Critical)
+        dlg.setIcon(QMessageBox.Icon.Critical)
         dlg.setWindowTitle("Photo Organizer — Error")
         dlg.setText("An error occurred during photo organization.")
         dlg.setInformativeText(summary)
         if details:
             dlg.setDetailedText(details)
-        dlg.setStandardButtons(QMessageBox.Ok)
-        dlg.exec_()
+        dlg.setStandardButtons(QMessageBox.StandardButton.Ok)
+        dlg.exec()
 
     def on_progress_update(self, message: str):
         """Handle progress updates.
@@ -499,11 +500,11 @@ class PhotoOrganizerGUI(QMainWindow):
                 self,
                 "Close Application",
                 "Photo organization is in progress. Are you sure you want to exit?",
-                QMessageBox.Yes | QMessageBox.No,
-                QMessageBox.No,
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
             )
 
-            if reply == QMessageBox.Yes:
+            if reply == QMessageBox.StandardButton.Yes:
                 self.worker.terminate()
                 self.worker.wait()
                 event.accept()
