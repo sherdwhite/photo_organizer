@@ -13,6 +13,8 @@ import logging
 import shutil
 import subprocess
 from datetime import datetime
+from hachoir.metadata import extractMetadata
+from hachoir.parser import createParser
 from typing import Optional
 
 from photo_organizer.date_utils import validate_date
@@ -162,9 +164,6 @@ def _extract_hachoir_creation_date(file_path: str, file_type: str) -> Optional[s
         Validated creation date string, or None
     """
     try:
-        from hachoir.metadata import extractMetadata
-        from hachoir.parser import createParser
-
         parser = createParser(file_path)
         if not parser:
             logger.warning(

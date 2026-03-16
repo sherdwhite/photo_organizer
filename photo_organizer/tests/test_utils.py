@@ -72,3 +72,10 @@ def test_parse_args_custom_both(monkeypatch):
     args = parse_args()
     assert args["origin_dir"] == "/custom/origin"
     assert args["destination_dir"] == "/custom/destination"
+
+
+def test_get_default_pictures_directory_exception():
+    """Test fallback to cwd when Path.home() raises."""
+    with patch("photo_organizer.utils.Path.home", side_effect=RuntimeError("no home")):
+        result = get_default_pictures_directory()
+    assert result == os.getcwd()

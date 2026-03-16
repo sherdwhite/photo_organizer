@@ -5,3 +5,4 @@ pillow>=12.1.0
 pillow-heif>=1.2.0
 PySide6>=6.10.2
 pytest>=9.0.2
+pytest-cov>=7.0.0

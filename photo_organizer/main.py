@@ -3,9 +3,11 @@ import argparse
 import logging
 import sys
 
+from gui.photo_organizer_gui import run_gui
 from photo_organizer import __version__
 from photo_organizer.log import setup_logging
 from photo_organizer.organize_photos import organize
+
 
 # Set up basic logging first (will be reconfigured in organize() if needed)
 setup_logging("photo_organizer", level="INFO", console_level="INFO")
@@ -39,8 +41,6 @@ def main():
     if args.gui:
         logger.info("Starting photo_organizer GUI. Version %s", __version__)
         try:
-            from gui.photo_organizer_gui import run_gui
-
             return run_gui()
         except ImportError as e:
             logger.error("Failed to import GUI components: %s", e)
@@ -61,8 +61,6 @@ def run():
     # Check if GUI should be launched (no command line args)
     if len(sys.argv) == 1:
         try:
-            from gui.photo_organizer_gui import run_gui
-
             return run_gui()
         except ImportError:
             # Fall back to CLI if GUI not available

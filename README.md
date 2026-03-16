@@ -127,6 +127,12 @@ destination_folder/
 pytest photo_organizer/tests/
 ```
 
+### Running Tests with Coverage
+
+```bash
+pytest --cov=photo_organizer photo_organizer/tests/
+```
+
 ### Development Helper
 
 Use the development script for common tasks:
