@@ -19,21 +19,28 @@ git clone https://github.com/yourusername/photo_organizer.git
 cd photo_organizer
 ```
 
-2. Create and activate a virtual environment (recommended):
+2. Create and activate a virtual environment:
 ```bash
 # Create virtual environment
-python -m venv venv
+python3 -m venv .venv
 
 # Activate virtual environment
+# On macOS/Linux:
+source .venv/bin/activate
 # On Windows (Git Bash):
 source .venv/Scripts/activate
 # On Windows (Command Prompt):
-venv\Scripts\activate
-# On macOS/Linux:
-source .venv/bin/activate
+.venv\Scripts\activate
+# On Windows (PowerShell):
+.venv\Scripts\Activate.ps1
 ```
 
-3. Install FFmpeg (optional, **recommended** for fast video processing):
+3. Install Python dependencies:
+```bash
+pip install -r requirements.txt
+```
+
+4. Install FFmpeg (optional, **recommended** for fast video processing):
 ```bash
 # Fedora/RHEL:
 sudo dnf install ffmpeg
@@ -46,11 +53,6 @@ winget install FFmpeg
 ```
 
 > Without FFmpeg the app still works — it falls back to the hachoir library, which is slower on large video files.
-
-5. Install Python dependencies:
-```bash
-pip install -r requirements.txt
-```
 
 ## Usage
 
