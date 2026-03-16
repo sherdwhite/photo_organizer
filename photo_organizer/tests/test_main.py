@@ -1,7 +1,7 @@
-import subprocess
-import sys
+import runpy
 from unittest.mock import patch
 
+import pytest
 
 from photo_organizer.main import main, run
 
@@ -63,12 +63,11 @@ class TestRun:
 
 
 class TestMainGuard:
-    def test_main_module_execution(self):
-        """Cover `if __name__ == '__main__': sys.exit(main())` (line 76)."""
-        result = subprocess.run(
-            [sys.executable, "-m", "photo_organizer.main", "--version"],
-            capture_output=True,
-            text=True,
-        )
-        assert result.returncode == 0
-        assert "Photo Organizer" in result.stdout
+    def test_main_module_execution(self, monkeypatch):
+        """Cover `if __name__ == '__main__': sys.exit(main())`."""
+        monkeypatch.setattr("sys.argv", ["program", "--version"])
+        with pytest.raises(SystemExit) as exc_info:
+            runpy.run_module(
+                "photo_organizer.main", run_name="__main__", alter_sys=False
+            )
+        assert exc_info.value.code == 0

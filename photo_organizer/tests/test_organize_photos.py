@@ -31,12 +31,6 @@ def setup_dirs():
         handler.close()
         root_logger.removeHandler(handler)
 
-    # Also close photo_organizer logger handlers
-    photo_logger = logging.getLogger("photo_organizer")
-    for handler in photo_logger.handlers[:]:
-        handler.close()
-        photo_logger.removeHandler(handler)
-
     shutil.rmtree(test_dir)
 
 
